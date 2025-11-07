@@ -1,0 +1,113 @@
+name: Security Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  secret-scan:
+    name: Scan for Secrets
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run secret detection
+      run: |
+        echo "🔍 Scanning for potential secrets..."
+        
+        # Check for common secret patterns
+        FOUND=0
+        
+        # SSH Private Keys
+        if git diff origin/main --unified=0 | grep -E "BEGIN (RSA|DSA|EC|OPENSSH) PRIVATE KEY"; then
+          echo "❌ ERROR: SSH private key detected"
+          FOUND=1
+        fi
+        
+        # Passwords in code
+        if git diff origin/main --unified=0 | grep -iE "password\s*=\s*['\"][^'\"]{8,}" | grep -v "YOUR_.*_HERE" | grep -v "placeholder"; then
+          echo "❌ ERROR: Hardcoded password detected"
+          FOUND=1
+        fi
+        
+        # API Keys
+        if git diff origin/main --unified=0 | grep -iE "(api_key|apikey)\s*=\s*['\"][^'\"]{20,}" | grep -v "YOUR_.*_HERE"; then
+          echo "❌ ERROR: API key detected"
+          FOUND=1
+        fi
+        
+        # AWS Keys
+        if git diff origin/main --unified=0 | grep -E "AKIA[0-9A-Z]{16}"; then
+          echo "❌ ERROR: AWS access key detected"
+          FOUND=1
+        fi
+        
+        # Azure Connection Strings
+        if git diff origin/main --unified=0 | grep -E "DefaultEndpointsProtocol=https.*AccountKey="; then
+          echo "❌ ERROR: Azure connection string detected"
+          FOUND=1
+        fi
+        
+        # Generic secrets
+        if git diff origin/main --unified=0 | grep -iE "secret\s*=\s*['\"][^'\"]{20,}" | grep -v "YOUR_.*_HERE" | grep -v "placeholder"; then
+          echo "❌ ERROR: Hardcoded secret detected"
+          FOUND=1
+        fi
+        
+        if [ $FOUND -eq 0 ]; then
+          echo "✅ No secrets detected"
+          exit 0
+        else
+          echo ""
+          echo "❌ Potential secrets found in commit"
+          echo "Please review and remove any sensitive data before merging"
+          exit 1
+        fi
+
+    - name: Check for forbidden file types
+      run: |
+        echo "🔍 Checking for forbidden file types..."
+        
+        FOUND=0
+        FORBIDDEN_PATTERNS=(
+          "*.pem"
+          "*.key"
+          "*id_rsa"
+          "*.tfstate"
+          ".env"
+          "credentials.json"
+          "secrets.json"
+          "*.publishsettings"
+        )
+        
+        for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+          if find . -type f -name "$pattern" -not -path "./.git/*" | grep .; then
+            echo "❌ ERROR: Forbidden file type found: $pattern"
+            FOUND=1
+          fi
+        done
+        
+        if [ $FOUND -eq 0 ]; then
+          echo "✅ No forbidden files found"
+          exit 0
+        else
+          exit 1
+        fi
+
+    - name: Verify placeholder values
+      run: |
+        echo "🔍 Verifying placeholder values in parameter files..."
+        
+        # Check that parameter file still has placeholder
+        if ! grep -q "YOUR_SSH_PUBLIC_KEY_HERE" infrastructure/main.parameters.json; then
+          echo "⚠️  WARNING: SSH key placeholder may have been replaced"
+          echo "Verify that no real SSH keys are in main.parameters.json"
+        fi
+        
+        echo "✅ Placeholder check complete"

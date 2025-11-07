@@ -1,0 +1,79 @@
+# Build
+bin/
+obj/
+publish/
+*.dll
+*.exe
+*.pdb
+
+# .NET
+*.user
+*.suo
+.vs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+*.exe~
+vendor/
+*.test
+*.out
+
+# Java
+target/
+.gradle/
+build/
+*.class
+*.jar
+*.war
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+*.local
+
+# Reports
+*.json
+load-test-*.json
+
+# Kubernetes
+*.yaml.bak
+*.tmp
+
+# SSH Keys - NEVER COMMIT THESE
+*.pem
+*.key
+id_rsa*
+*.ppk
+authorized_keys
+
+# Azure/Secrets - NEVER COMMIT THESE
+*.publishsettings
+*.azurePubxml
+credentials.json
+secrets.json
+appsettings.*.json
+!appsettings.json
+*.parameters.dev.json
+*.parameters.local.json
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+
+# Scripts - exclude if needed
+!scripts/*.sh
