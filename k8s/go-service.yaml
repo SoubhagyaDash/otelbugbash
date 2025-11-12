@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: go-service
-        image: otelbugbashacrkzcyav7snm2ka.azurecr.io/go-service:latest
+        image: otelbugbashacr3kze3ucruvwwu.azurecr.io/go-service:latest
         ports:
         - containerPort: 8080
           name: http
@@ -60,6 +60,13 @@ spec:
     name: http
   selector:
     app: go-service
+
+
+
+
+
+
+
 
 
 

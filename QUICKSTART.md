@@ -30,9 +30,12 @@
 
 ### Deployment
 
-```bash
+```PowerShell
+# Select subscription
+az account set --subscription "YOUR_SUBSCRIPTION_NAME"
+
 # Full deployment (creates ACR automatically)
-./scripts/deploy-all.sh otel-bugbash-rg eastus ~/.ssh/otelbugbash_rsa.pub http://your-collector:4318
+.\scripts\deploy-all.ps1 RESOURCE_GROUP_NAME eastus2 ~\.ssh\otelbugbash_rsa.pub http://your-collector:4318
 
 # Get ACR name from deployment
 ACR_NAME=$(az deployment group show -g otel-bugbash-rg -n main --query properties.outputs.acrName.value -o tsv)

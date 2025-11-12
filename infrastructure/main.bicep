@@ -139,6 +139,11 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-05-01' = {
 resource vm 'Microsoft.Compute/virtualMachines@2023-03-01' = {
   name: vmName
   location: location
+  tags: {
+    SkipLinuxAzSecPack: 'True'
+    SkipASMAzSecPack: 'True'
+    SkipWindowsAzSecPack: 'True'
+  }
   properties: {
     hardwareProfile: {
       vmSize: vmSize
@@ -178,6 +183,27 @@ resource vm 'Microsoft.Compute/virtualMachines@2023-03-01' = {
           id: nic.id
         }
       ]
+    }
+  }
+}
+
+// Azure Monitor Linux Agent Extension
+resource vmAzureMonitorAgent 'Microsoft.Compute/virtualMachines/extensions@2023-03-01' = {
+  parent: vm
+  name: 'AzureMonitorLinuxAgent'
+  location: location
+  properties: {
+    publisher: 'Microsoft.Azure.Monitor'
+    type: 'AzureMonitorLinuxAgent'
+    typeHandlerVersion: '1.0'
+    autoUpgradeMinorVersion: true
+    settings: {
+      azureMonitorConfiguration: {
+        enable: true
+      }
+      genevaConfiguration: {
+        enable: false
+      }
     }
   }
 }

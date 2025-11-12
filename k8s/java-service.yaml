@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: java-service
-        image: otelbugbashacrkzcyav7snm2ka.azurecr.io/java-service:latest
+        image: otelbugbashacr3kze3ucruvwwu.azurecr.io/java-service:latest
         ports:
         - containerPort: 8080
           name: http
@@ -68,6 +68,13 @@ spec:
     name: http
   selector:
     app: java-service
+
+
+
+
+
+
+
 
 
 

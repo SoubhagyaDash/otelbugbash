@@ -17,8 +17,9 @@ echo "Java Service URL: $JAVA_SERVICE_URL"
 
 # Update system
 echo "Updating system packages..."
-sudo apt-get update
-sudo apt-get upgrade -y
+sudo apt-get update -qq > /dev/null
+sudo apt-get upgrade -y -qq > /dev/null
+echo "System packages updated successfully"
 
 # Install Docker using official apt repository (more reliable than get.docker.com)
 echo "Installing Docker..."
@@ -66,7 +67,7 @@ fi
 
 # Login to ACR
 echo "Logging in to Azure Container Registry..."
-echo "$ACR_PASSWORD" | docker login "${ACR_NAME}.azurecr.io" -u "$ACR_NAME" --password-stdin
+docker login "${ACR_NAME}.azurecr.io" -u "$ACR_NAME" -p "$ACR_PASSWORD"
 
 # Create directories
 echo "Creating application directories..."
