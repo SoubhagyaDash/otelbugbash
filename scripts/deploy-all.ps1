@@ -362,10 +362,13 @@ Write-Host "  curl http://${vmIp}:5000/health"
 Write-Host "  curl http://${vmIp}:5000/api/process"
 Write-Host ""
 Write-Host "SSH to VM:" -ForegroundColor Yellow
-Write-Host "  ssh -i $sshPrivateKey azureuser@$vmIp"
+Write-Host "  ssh azureuser@$vmIp"
+Write-Host "  Password: OtelBugBash2025!"
+Write-Host ""
+Write-Host "  (Or with key: ssh -i $sshPrivateKey azureuser@$vmIp)"
 Write-Host ""
 Write-Host "Run Load Test:" -ForegroundColor Yellow
-Write-Host "  ssh -i $sshPrivateKey azureuser@$vmIp"
+Write-Host "  ssh azureuser@$vmIp"
 Write-Host "  cd /opt/otel-bugbash && ./run-load-test.sh 5m 10"
 Write-Host ""
 Write-Host "View Kubernetes Resources:" -ForegroundColor Yellow

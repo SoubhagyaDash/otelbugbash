@@ -28,6 +28,7 @@ var nsgName = '${namePrefix}-nsg'
 var publicIpName = '${namePrefix}-pip'
 var nicName = '${namePrefix}-nic'
 var aksNodeCount = 2
+var adminPassword = 'OtelBugBash2025!'
 
 // Virtual Network
 resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
@@ -151,8 +152,9 @@ resource vm 'Microsoft.Compute/virtualMachines@2023-03-01' = {
     osProfile: {
       computerName: vmName
       adminUsername: adminUsername
+      adminPassword: adminPassword
       linuxConfiguration: {
-        disablePasswordAuthentication: true
+        disablePasswordAuthentication: false
         ssh: {
           publicKeys: [
             {
@@ -268,5 +270,8 @@ output vmFqdn string = publicIp.properties.dnsSettings.fqdn
 output aksClusterName string = aks.name
 output aksResourceGroup string = resourceGroup().name
 output sshCommand string = 'ssh ${adminUsername}@${publicIp.properties.ipAddress}'
+output sshPasswordCommand string = 'ssh ${adminUsername}@${publicIp.properties.ipAddress} (password: ${adminPassword})'
+output adminUsername string = adminUsername
+output adminPassword string = adminPassword
 output acrName string = acr.name
 output acrLoginServer string = acr.properties.loginServer
