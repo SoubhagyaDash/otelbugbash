@@ -85,31 +85,23 @@ services:
     image: ${ACR_NAME}.azurecr.io/dotnet-service:latest
     container_name: dotnet-service
     restart: always
-    ports:
-      - "5000:5000"
+    network_mode: "host"
     environment:
       - ASPNETCORE_URLS=http://+:5000
       - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=${OTEL_TRACES_ENDPOINT}
       - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=${OTEL_METRICS_ENDPOINT}
       - JAVA_SERVICE_URL=${JAVA_SERVICE_URL}
       - OTEL_RESOURCE_ATTRIBUTES
-    networks:
-      - otel-network
 
   load-generator:
     image: ${ACR_NAME}.azurecr.io/load-generator:latest
     container_name: load-generator
     restart: "no"
+    network_mode: "host"
     volumes:
       - ./reports:/reports
-    networks:
-      - otel-network
     profiles:
       - tools
-
-networks:
-  otel-network:
-    driver: bridge
 EOF
 
 # Create systemd service for docker-compose
@@ -151,7 +143,7 @@ echo "  Rate: $RATE req/sec"
 echo "  Report: $REPORT_FILE"
 
 docker compose run --rm load-generator \
-  --url http://dotnet-service:5000/api/process \
+  --url http://localhost:5000/api/process \
   --duration "$DURATION" \
   --rate "$RATE" \
   --report-file "$REPORT_FILE"
