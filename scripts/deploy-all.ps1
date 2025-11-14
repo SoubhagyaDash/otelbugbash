@@ -17,8 +17,8 @@
 #>
 
 param(
-    [Parameter(Mandatory=$true, HelpMessage="Azure resource group name")]
-    [string]$ResourceGroup,
+    [Parameter(Mandatory=$true, HelpMessage="Azure resource group name template (use {0} for index substitution)")]
+    [string]$ResourceGroupTemplate,
     
     [Parameter(Mandatory=$true, HelpMessage="Azure region (e.g., eastus, westus2)")]
     [string]$Location,
@@ -45,6 +45,18 @@ az upgrade
 
 # Login to Azure CLI (no subscription prompt)
 az login
+
+# Loop 10 times, substituting {0} in ResourceGroupTemplate with index 0-9
+for ($i = 0; $i -lt 1; $i++) {
+    # Substitute {0} in ResourceGroupTemplate with current index
+    $ResourceGroup = $ResourceGroupTemplate -replace '\{0\}', $i
+    
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host "Starting deployment $i of 10" -ForegroundColor Magenta
+    Write-Host "Resource Group: $ResourceGroup" -ForegroundColor Magenta
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host ""
 
 # Get the script directory and project root
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -314,20 +326,64 @@ $sshPrivateKey = $SshKeyPath -replace '\.pub$', ''
 Write-Host "Copying setup script to VM..."
 scp -i $sshPrivateKey -o StrictHostKeyChecking=no "$ScriptDir\vm-setup.sh" azureuser@${vmIp}:/tmp/vm-setup.sh
 
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Error: Failed to copy setup script to VM" -ForegroundColor Red
+    exit 1
+}
+
 Write-Host "Running setup script on VM..."
 ssh -i $sshPrivateKey -o StrictHostKeyChecking=no azureuser@$vmIp "chmod +x /tmp/vm-setup.sh && bash /tmp/vm-setup.sh '$acrNameOnly' '$acrPassword' '$OtelTracesEndpoint' '$OtelMetricsEndpoint' '$javaServiceUrl'"
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Error: VM setup script failed! Check the output above for details." -ForegroundColor Red
+    Write-Host "You can manually SSH to the VM and check the setup:" -ForegroundColor Yellow
+    Write-Host "  ssh -i $sshPrivateKey azureuser@$vmIp" -ForegroundColor Yellow
+    Write-Host "  sudo journalctl -xe" -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "VM setup completed successfully" -ForegroundColor Green
 
 # Deploy to VM
 Write-Host ""
 Write-Host "Step 8: Deploying .NET service to VM..." -ForegroundColor Green
 
 # Update docker-compose on VM and restart - use separate commands to avoid line ending issues
+Write-Host "Logging into ACR from VM..."
 ssh -i $sshPrivateKey -o StrictHostKeyChecking=no azureuser@$vmIp "docker login ${acrNameOnly}.azurecr.io -u $acrNameOnly -p '$acrPassword'"
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Error: Failed to login to ACR from VM" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Updating Java service URL in docker-compose..."
 ssh -i $sshPrivateKey -o StrictHostKeyChecking=no azureuser@$vmIp "cd /opt/otel-bugbash && sed -i 's|JAVA_SERVICE_URL=.*|JAVA_SERVICE_URL=${javaServiceUrl}|' docker-compose.yml"
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Error: Failed to update docker-compose.yml" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Pulling Docker images..."
 ssh -i $sshPrivateKey -o StrictHostKeyChecking=no azureuser@$vmIp "cd /opt/otel-bugbash && docker compose pull"
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Error: Failed to pull Docker images" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Starting services..."
 ssh -i $sshPrivateKey -o StrictHostKeyChecking=no azureuser@$vmIp "sudo systemctl daemon-reload"
 ssh -i $sshPrivateKey -o StrictHostKeyChecking=no azureuser@$vmIp "sudo systemctl enable otel-bugbash"
 ssh -i $sshPrivateKey -o StrictHostKeyChecking=no azureuser@$vmIp "sudo systemctl restart otel-bugbash"
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Error: Failed to start otel-bugbash service" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host ".NET service deployed successfully" -ForegroundColor Green
 
 Start-Sleep -Seconds 5
 
@@ -378,4 +434,12 @@ Write-Host "  kubectl logs -l app=go-service"
 Write-Host ""
 Write-Host "Cleanup:" -ForegroundColor Yellow
 Write-Host "  az group delete --name $ResourceGroup --yes --no-wait"
+Write-Host ""
+
+} # End of for loop
+
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Magenta
+Write-Host "All 10 deployments completed!" -ForegroundColor Magenta
+Write-Host "========================================" -ForegroundColor Magenta
 Write-Host ""

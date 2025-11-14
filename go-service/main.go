@@ -124,7 +124,9 @@ func initMeter() (*sdkmetric.MeterProvider, error) {
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	_, span := tracer.Start(ctx, "health-check")
+	_, span := tracer.Start(ctx, "health-check",
+		trace.WithSpanKind(trace.SpanKindServer),
+	)
 	defer span.End()
 
 	response := HealthResponse{
@@ -140,6 +142,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 func computeHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	ctx, span := tracer.Start(ctx, "compute-request",
+		trace.WithSpanKind(trace.SpanKindServer),
 		trace.WithAttributes(
 			attribute.String("http.method", r.Method),
 			attribute.String("http.url", r.URL.String()),
@@ -197,7 +200,9 @@ func computeHandler(w http.ResponseWriter, r *http.Request) {
 
 func metricsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	_, span := tracer.Start(ctx, "metrics")
+	_, span := tracer.Start(ctx, "metrics",
+		trace.WithSpanKind(trace.SpanKindServer),
+	)
 	defer span.End()
 
 	metrics := map[string]interface{}{
