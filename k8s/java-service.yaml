@@ -29,8 +29,6 @@ spec:
           value: "otlp"
         - name: OTEL_EXPORTER_OTLP_PROTOCOL
           value: "http/protobuf"
-        - name: OTEL_EXPORTER_OTLP_ENDPOINT
-          value: "http://localhost:4318"  # Update with your OTLP collector endpoint
         - name: GO_SERVICE_URL
           value: "http://go-service:8080"
         resources:

@@ -1,4 +1,7 @@
-FROM golang:1.21-alpine AS build
+FROM golang:1.23-alpine AS build
+
+# Install git (required for go mod download)
+RUN apk add --no-cache git
 
 WORKDIR /app
 

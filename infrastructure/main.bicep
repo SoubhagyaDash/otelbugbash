@@ -27,7 +27,7 @@ var vnetName = '${namePrefix}-vnet'
 var nsgName = '${namePrefix}-nsg'
 var publicIpName = '${namePrefix}-pip'
 var nicName = '${namePrefix}-nic'
-var aksNodeCountMin = 2
+var aksNodeCountMin = 3
 var aksNodeCountMax = 4
 var adminPassword = 'OtelBugBash2025!'
 
