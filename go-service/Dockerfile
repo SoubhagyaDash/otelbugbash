@@ -23,6 +23,5 @@ COPY --from=build /app/go-service .
 EXPOSE 8080
 
 ENV PORT=8080
-ENV OTEL_EXPORTER_OTLP_ENDPOINT="localhost:4318"
 
 CMD ["./go-service"]

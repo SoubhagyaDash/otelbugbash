@@ -27,7 +27,8 @@ var vnetName = '${namePrefix}-vnet'
 var nsgName = '${namePrefix}-nsg'
 var publicIpName = '${namePrefix}-pip'
 var nicName = '${namePrefix}-nic'
-var aksNodeCount = 2
+var aksNodeCountMin = 2
+var aksNodeCountMax = 4
 var adminPassword = 'OtelBugBash2025!'
 
 // Virtual Network
@@ -238,7 +239,10 @@ resource aks 'Microsoft.ContainerService/managedClusters@2023-08-01' = {
     agentPoolProfiles: [
       {
         name: 'agentpool'
-        count: aksNodeCount
+        count: aksNodeCountMin
+        minCount: aksNodeCountMin
+        maxCount: aksNodeCountMax
+        enableAutoScaling: true
         vmSize: aksNodeSize
         osType: 'Linux'
         mode: 'System'
