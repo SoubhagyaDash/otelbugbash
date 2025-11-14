@@ -12,15 +12,23 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
-var tracer trace.Tracer
+var (
+	tracer       trace.Tracer
+	meter        metric.Meter
+	cowsSold     metric.Int64Counter
+	requestCount metric.Int64Counter
+)
 
 type HealthResponse struct {
 	Status    string `json:"status"`
@@ -29,11 +37,11 @@ type HealthResponse struct {
 }
 
 type ComputeResponse struct {
-	Service        string  `json:"service"`
-	Timestamp      string  `json:"timestamp"`
-	ComputeTimeMs  int     `json:"computeTimeMs"`
-	RandomValue    int     `json:"randomValue"`
-	Result         float64 `json:"result"`
+	Service       string  `json:"service"`
+	Timestamp     string  `json:"timestamp"`
+	ComputeTimeMs int     `json:"computeTimeMs"`
+	RandomValue   int     `json:"randomValue"`
+	Result        float64 `json:"result"`
 }
 
 type ErrorResponse struct {
@@ -45,15 +53,9 @@ type ErrorResponse struct {
 func initTracer() (*sdktrace.TracerProvider, error) {
 	ctx := context.Background()
 
-	// Get OTLP endpoint from environment
-	otlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-	if otlpEndpoint == "" {
-		otlpEndpoint = "localhost:4318"
-	}
-
 	// Create OTLP HTTP exporter
+	// Will use OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT env var
 	exporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint(otlpEndpoint),
 		otlptracehttp.WithInsecure(),
 	)
 	if err != nil {
@@ -84,6 +86,40 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 	))
 
 	return tp, nil
+}
+
+func initMeter() (*sdkmetric.MeterProvider, error) {
+	ctx := context.Background()
+
+	// Create OTLP HTTP metrics exporter
+	// Will use OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_METRICS_ENDPOINT env var
+	exporter, err := otlpmetrichttp.New(ctx,
+		otlpmetrichttp.WithInsecure(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OTLP metrics exporter: %w", err)
+	}
+
+	// Create resource
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceName("go-service"),
+			semconv.ServiceVersion("1.0.0"),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	// Create meter provider
+	mp := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)),
+		sdkmetric.WithResource(res),
+	)
+
+	otel.SetMeterProvider(mp)
+
+	return mp, nil
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -174,17 +210,30 @@ func metricsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(metrics)
 }
 
-// Middleware to extract trace context from incoming requests
+// Middleware to extract trace context from incoming requests and increment metrics
 func tracingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 		r = r.WithContext(ctx)
+
+		// Increment cows_sold counter on every request
+		cowsSold.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("http.method", r.Method),
+			attribute.String("http.route", r.URL.Path),
+		))
+
+		// Increment request counter
+		requestCount.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("http.method", r.Method),
+			attribute.String("http.route", r.URL.Path),
+		))
+
 		next(w, r)
 	}
 }
 
 func main() {
-	// Initialize OpenTelemetry
+	// Initialize OpenTelemetry tracing
 	tp, err := initTracer()
 	if err != nil {
 		log.Fatalf("Failed to initialize tracer: %v", err)
@@ -195,7 +244,38 @@ func main() {
 		}
 	}()
 
+	// Initialize OpenTelemetry metrics
+	mp, err := initMeter()
+	if err != nil {
+		log.Fatalf("Failed to initialize meter: %v", err)
+	}
+	defer func() {
+		if err := mp.Shutdown(context.Background()); err != nil {
+			log.Printf("Error shutting down meter provider: %v", err)
+		}
+	}()
+
 	tracer = otel.Tracer("go-service")
+	meter = otel.Meter("go-service")
+
+	// Create metrics instruments
+	cowsSold, err = meter.Int64Counter(
+		"cows_sold",
+		metric.WithDescription("The number of cows sold (increments on every request)"),
+		metric.WithUnit("{cows}"),
+	)
+	if err != nil {
+		log.Fatalf("Failed to create cows_sold counter: %v", err)
+	}
+
+	requestCount, err = meter.Int64Counter(
+		"http.server.request.count",
+		metric.WithDescription("The number of HTTP requests received"),
+		metric.WithUnit("{requests}"),
+	)
+	if err != nil {
+		log.Fatalf("Failed to create request counter: %v", err)
+	}
 
 	// Seed random number generator
 	rand.Seed(time.Now().UnixNano())
@@ -211,7 +291,6 @@ func main() {
 	}
 
 	log.Printf("Go service starting on port %s", port)
-	log.Printf("OTLP endpoint: %s", os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
 
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
