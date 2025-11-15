@@ -6,13 +6,9 @@ echo "Starting setup at $(date)"
 
 ACR_NAME="${1}"
 ACR_PASSWORD="${2}"
-OTEL_TRACES_ENDPOINT="${3:-http://localhost:4319}"
-OTEL_METRICS_ENDPOINT="${4:-http://localhost:4317}"
-JAVA_SERVICE_URL="${5:-http://java-service:8080}"
+JAVA_SERVICE_URL="${3:-http://java-service:8080}"
 
 echo "ACR Name: $ACR_NAME"
-echo "OTLP Traces/Logs Endpoint: $OTEL_TRACES_ENDPOINT"
-echo "OTLP Metrics Endpoint: $OTEL_METRICS_ENDPOINT"
 echo "Java Service URL: $JAVA_SERVICE_URL"
 
 # Update system
@@ -88,8 +84,8 @@ services:
     network_mode: "host"
     environment:
       - ASPNETCORE_URLS=http://+:5000
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=${OTEL_TRACES_ENDPOINT}
-      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=${OTEL_METRICS_ENDPOINT}
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4319
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:4317
       - JAVA_SERVICE_URL=${JAVA_SERVICE_URL}
       - OTEL_RESOURCE_ATTRIBUTES
 
@@ -107,6 +103,20 @@ EOF
 # Create systemd service for docker-compose
 # Create systemd service for docker compose
 echo "Creating systemd service..."
+
+# Create a wrapper script that reads OTEL_RESOURCE_ATTRIBUTES from current environment
+cat > /opt/otel-bugbash/start-service.sh <<'EOF'
+#!/bin/bash
+# Read OTEL_RESOURCE_ATTRIBUTES from /etc/environment and export it
+if [ -f /etc/environment ]; then
+  eval "$(grep '^OTEL_RESOURCE_ATTRIBUTES=' /etc/environment)"
+  export OTEL_RESOURCE_ATTRIBUTES
+fi
+cd /opt/otel-bugbash
+exec /usr/bin/docker compose up -d dotnet-service
+EOF
+chmod +x /opt/otel-bugbash/start-service.sh
+
 sudo tee /etc/systemd/system/otel-bugbash.service > /dev/null <<EOF
 [Unit]
 Description=OpenTelemetry Bug Bash .NET Service
@@ -117,9 +127,9 @@ After=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/otel-bugbash
-ExecStart=/usr/bin/docker compose up -d dotnet-service
+ExecStart=/opt/otel-bugbash/start-service.sh
 ExecStop=/usr/bin/docker compose down
-ExecReload=/usr/bin/docker compose pull && /usr/bin/docker compose up -d
+ExecReload=/usr/bin/docker compose pull && /opt/otel-bugbash/start-service.sh
 StandardOutput=journal
 StandardError=journal
 
