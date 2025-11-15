@@ -10,10 +10,6 @@
     Azure region
 .PARAMETER SshKeyPath
     Path to SSH public key
-.PARAMETER OtelTracesEndpoint
-    OTLP endpoint for traces and logs (gRPC)
-.PARAMETER OtelMetricsEndpoint
-    OTLP endpoint for metrics (gRPC)
 #>
 
 param(
@@ -24,13 +20,7 @@ param(
     [string]$Location,
     
     [Parameter(Mandatory=$false)]
-    [string]$SshKeyPath = "$env:USERPROFILE\.ssh\otelbugbash_rsa.pub",
-    
-    [Parameter(Mandatory=$false)]
-    [string]$OtelTracesEndpoint = "http://localhost:4319",
-    
-    [Parameter(Mandatory=$false)]
-    [string]$OtelMetricsEndpoint = "http://localhost:4317"
+    [string]$SshKeyPath = "$env:USERPROFILE\.ssh\otelbugbash_rsa.pub"
 )
 
 $ErrorActionPreference = "Stop"
@@ -332,7 +322,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Running setup script on VM..."
-ssh -i $sshPrivateKey -o StrictHostKeyChecking=no azureuser@$vmIp "chmod +x /tmp/vm-setup.sh && bash /tmp/vm-setup.sh '$acrNameOnly' '$acrPassword' '$OtelTracesEndpoint' '$OtelMetricsEndpoint' '$javaServiceUrl'"
+ssh -i $sshPrivateKey -o StrictHostKeyChecking=no azureuser@$vmIp "chmod +x /tmp/vm-setup.sh && bash /tmp/vm-setup.sh '$acrNameOnly' '$acrPassword' '$javaServiceUrl'"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error: VM setup script failed! Check the output above for details." -ForegroundColor Red
